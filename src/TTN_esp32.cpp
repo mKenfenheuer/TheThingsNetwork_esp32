@@ -5,7 +5,6 @@
 #include "TTN_esp32.h"
 
 #include "ByteArrayUtils.h"
-#include "NVSHandler.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "helper.h"
@@ -133,21 +132,12 @@ bool TTN_esp32::provision(const char* appEui, const char* appKey)
 	}
 	Serial.println();
 #endif // DEBUG
-
-	if (decode(false, nullptr, appEui, appKey))
-	{
-		return saveKeys();
-	}
-	return false;
+	return decode(false, nullptr, appEui, appKey);
 }
 
 bool TTN_esp32::provision(const char* devEui, const char* appEui, const char* appKey)
 {
-	if (decode(true, devEui, appEui, appKey))
-	{
-		return saveKeys();
-	}
-	return false;
+	return decode(true, devEui, appEui, appKey);
 }
 
 bool TTN_esp32::provisionABP(const char* devAddr, const char* nwkSKey, const char* appSKey)
@@ -155,17 +145,13 @@ bool TTN_esp32::provisionABP(const char* devAddr, const char* nwkSKey, const cha
 	ByteArrayUtils::hexStrToBin(nwkSKey, rtc_net_session_key, 16);
 	ByteArrayUtils::hexStrToBin(appSKey, rtc_app_session_key, 16);
 	ByteArrayUtils::hexStrToBin(devAddr, rtc_dev_adr, 4);
-	return saveKeys();
+	return true;
 }
 
 bool TTN_esp32::join()
 {
+	checkKeys();
 	bool success = false;
-
-	if (!_provisioned && !_session)
-	{
-		restoreKeys();
-	}
 	// Check if this is a cold boot
 	if (_session && rtc_sequenceNumberUp != 0)
 	{
@@ -336,80 +322,6 @@ bool TTN_esp32::isProvisioned()
 {
 	return _provisioned;
 }
-
-bool TTN_esp32::saveKeys()
-{
-	bool success = false;
-
-	HandleCloser handleCloser{};
-	if (NVSHandler::openNvsWrite(NVS_FLASH_PARTITION, handleCloser))
-	{
-		if (NVSHandler::writeNvsValue(handleCloser, NVS_FLASH_KEY_DEV_EUI, dev_eui, sizeof(dev_eui))
-			&& NVSHandler::writeNvsValue(handleCloser, NVS_FLASH_KEY_APP_EUI, app_eui, sizeof(app_eui))
-			&& NVSHandler::writeNvsValue(handleCloser, NVS_FLASH_KEY_APP_KEY, app_key, sizeof(app_key)))
-		{
-			success = NVSHandler::commit(handleCloser);
-			ESP_LOGI(TAG, "Dev EUI, app EUI and app key saved in NVS storage");
-		}
-	}
-
-	return success;
-}
-
-bool TTN_esp32::restoreKeys(bool silent)
-{
-	HandleCloser handleCloser{};
-	if (NVSHandler::openNvsRead(NVS_FLASH_PARTITION, handleCloser))
-	{
-		uint8_t buf_dev_eui[8];
-		uint8_t buf_app_eui[8];
-		uint8_t buf_app_key[16];
-
-		if (NVSHandler::readNvsValue(handleCloser, NVS_FLASH_KEY_DEV_EUI, buf_dev_eui, sizeof(dev_eui), silent)
-			&& NVSHandler::readNvsValue(handleCloser, NVS_FLASH_KEY_APP_EUI, buf_app_eui, sizeof(app_eui), silent)
-			&& NVSHandler::readNvsValue(handleCloser, NVS_FLASH_KEY_APP_KEY, buf_app_key, sizeof(app_key), silent))
-		{
-			std::copy(buf_dev_eui, buf_dev_eui + 8, dev_eui);
-			std::copy(buf_app_eui, buf_app_eui + 8, app_eui);
-			std::copy(buf_app_key, buf_app_key + 16, app_key);
-
-			checkKeys();
-
-			if (_provisioned)
-			{
-				ESP_LOGI(TAG, "Dev and app EUI and app key have been restored from NVS storage");
-			}
-			else
-			{
-				ESP_LOGW(TAG, "Dev and app EUI and app key are invalid (zeroes only)");
-			}
-		}
-		else
-		{
-			_provisioned = false;
-		}
-	}
-	return _provisioned;
-}
-
-bool TTN_esp32::eraseKeys()
-{
-	bool success = false;
-	uint8_t emptyBuf[16] = { 0 };
-	HandleCloser handleCloser{};
-	if (NVSHandler::openNvsWrite(NVS_FLASH_PARTITION, handleCloser))
-	{
-		if (NVSHandler::writeNvsValue(handleCloser, NVS_FLASH_KEY_DEV_EUI, emptyBuf, sizeof(dev_eui))
-			&& NVSHandler::writeNvsValue(handleCloser, NVS_FLASH_KEY_APP_EUI, emptyBuf, sizeof(app_eui))
-			&& NVSHandler::writeNvsValue(handleCloser, NVS_FLASH_KEY_APP_KEY, emptyBuf, sizeof(app_key)))
-		{
-			success = NVSHandler::commit(handleCloser);
-			ESP_LOGI(TAG, "Dev EUI, app EUI and app key erased in NVS storage");
-		}
-	}
-	return success;
-}
-
 
 void TTN_esp32::showStatus()
 {

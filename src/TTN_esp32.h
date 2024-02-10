@@ -263,36 +263,6 @@ public:
 	bool isProvisioned();
 
 	///
-	/// Store the Device EUI, Application EUI, Application key,
-	/// Device address, Network session key and Application session key
-	/// in the non volatile memory
-	///
-	bool saveKeys();
-
-	///
-	/// Restore the Device EUI, Application EUI, Application key,
-	/// Device address, Network session key and Application session key
-	/// from the non volatile memory
-	/// @param silent Set to false for debug output
-	///
-	bool restoreKeys(bool silent = true);
-	///
-	/// Erase the Device EUI, Application EUI, Application key,
-	/// Device address, Network session key and Application session key
-	/// in the non volatile memory. All the bytes are 00.
-	///
-	bool eraseKeys();
-	//
-	/// Store the current frame counter in NVM
-	///
-	bool storeFrameCounter();
-
-	//
-	/// Get the current frame counter from NVM
-	///
-	uint32_t getFrameCounter();
-
-	///
 	/// Show the current status
 	///
 	/// Prints the current status to the serial console
